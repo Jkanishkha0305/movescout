@@ -8,22 +8,31 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Firebase setup for listening to updates
-import firebase_admin
-from firebase_admin import credentials, firestore, auth as firebase_auth
+# Firebase setup for listening to updates (optional in demo mode)
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
 
-# Initialize Firebase
-if not firebase_admin._apps:
-    firebase_cert_path = os.getenv("FIREBASE_ADMIN_CERT_PATH", "firebase_adminsdk.json")
-    cred = credentials.Certificate(firebase_cert_path)
-    firebase_admin.initialize_app(cred)
+if not DEMO_MODE:
+    import firebase_admin
+    from firebase_admin import credentials, firestore, auth as firebase_auth
 
-db = firestore.client()
+    # Initialize Firebase
+    if not firebase_admin._apps:
+        firebase_cert_path = os.getenv("FIREBASE_ADMIN_CERT_PATH", "firebase_adminsdk.json")
+        cred = credentials.Certificate(firebase_cert_path)
+        firebase_admin.initialize_app(cred)
+
+    db = firestore.client()
+else:
+    db = None  # In demo mode, backend handles storage
+    print("Gradio: Running in DEMO_MODE - Firebase disabled")
 
 # Global state
 current_user_id = "demo_user"  # For hackathon, using a single demo user
 BASE_URL = "http://127.0.0.1:8000"
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
 FIREBASE_ID_TOKEN = os.getenv("FIREBASE_ID_TOKEN")
+
+print(f"Gradio App - DEMO_MODE: {DEMO_MODE}")
 
 
 def _build_headers(include_json: bool = False) -> dict:
@@ -36,29 +45,35 @@ def _build_headers(include_json: bool = False) -> dict:
     return headers
 
 def get_session_data():
-    """Fetch current session data from Firestore"""
+    """Fetch current session data from Firestore (or return None in demo mode)"""
+    if DEMO_MODE or db is None:
+        # In demo mode, we can't fetch from Firestore
+        # The backend stores it, but Gradio UI won't show real-time updates
+        return None
+
     doc = db.collection('users').document(current_user_id).get()
     if doc.exists:
         return doc.to_dict()
     return None
 
-def send_message(message: str, history: List[Tuple[str, str]]):
+def send_message(message: str, history: List):
     """Send message to chat API"""
     if not message.strip():
         return history, ""
 
     # Add user message to history
-    history.append((message, "🤔 Thinking..."))
+    history.append({"role": "user", "content": message})
+    history.append({"role": "assistant", "content": "Thinking..."})
 
     # Send to backend
     try:
-        if not FIREBASE_ID_TOKEN:
-            raise RuntimeError("FIREBASE_ID_TOKEN is not set. Provide a valid Firebase ID token in the environment.")
+        if not DEMO_MODE and not FIREBASE_ID_TOKEN:
+            raise RuntimeError("FIREBASE_ID_TOKEN is not set. Provide a valid Firebase ID token or enable DEMO_MODE.")
 
         response = requests.post(
             f"{BASE_URL}/api/chat",
             json={"message": message},
-            headers=_build_headers(include_json=True)
+            headers=_build_headers(include_json=True) if FIREBASE_ID_TOKEN else {"Content-Type": "application/json"}
         )
 
         # Wait a bit for backend to process
@@ -72,10 +87,10 @@ def send_message(message: str, history: List[Tuple[str, str]]):
                 # Get the last assistant message
                 last_assistant_msg = next((m['content'] for m in reversed(messages) if m['role'] == 'assistant'), None)
                 if last_assistant_msg:
-                    history[-1] = (message, last_assistant_msg)
+                    history[-1] = {"role": "assistant", "content": last_assistant_msg}
 
     except Exception as e:
-        history[-1] = (message, f"❌ Error: {str(e)}")
+        history[-1] = {"role": "assistant", "content": f"❌ Error: {str(e)}"}
 
     return history, ""
 
@@ -209,12 +224,12 @@ def refresh_all():
 def start_new_session():
     """Start a new quote session"""
     try:
-        if not FIREBASE_ID_TOKEN:
-            raise RuntimeError("FIREBASE_ID_TOKEN is not set. Provide a valid Firebase ID token in the environment.")
+        if not DEMO_MODE and not FIREBASE_ID_TOKEN:
+            raise RuntimeError("FIREBASE_ID_TOKEN is not set. Provide a valid Firebase ID token or enable DEMO_MODE.")
 
         response = requests.get(
             f"{BASE_URL}/api/chat/new",
-            headers=_build_headers()
+            headers=_build_headers() if FIREBASE_ID_TOKEN else {}
         )
         time.sleep(1)
         return [], *refresh_all()
@@ -235,7 +250,7 @@ with gr.Blocks(title="MoveScout - AI Moving Assistant", theme=gr.themes.Soft()) 
         new_session_btn = gr.Button("🆕 New Session", scale=0)
 
     with gr.Tab("💬 Chat"):
-        chatbot = gr.Chatbot(label="Chat with MoveScout", height=400)
+        chatbot = gr.Chatbot(label="Chat with MoveScout", height=400, type='messages')
         msg_input = gr.Textbox(
             label="Your Message",
             placeholder="Tell me about your move (addresses, dates, apartment size, etc.)",
@@ -299,4 +314,4 @@ with gr.Blocks(title="MoveScout - AI Moving Assistant", theme=gr.themes.Soft()) 
     )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.launch(server_name="127.0.0.1", server_port=7860, share=False)

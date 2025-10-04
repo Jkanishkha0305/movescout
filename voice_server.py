@@ -11,14 +11,14 @@ from fastapi import BackgroundTasks
 from twilio.twiml.voice_response import VoiceResponse, Gather, Connect, Say, Stream
 from twilio.rest import Client
 from dotenv import load_dotenv
-from flask import Blueprint, request, jsonify
+# from flask import Blueprint, request, jsonify  # Not needed - using FastAPI
 from fastapi import APIRouter, Request, HTTPException
 from agents import firebase
 from agents.firebase import CallStatus
 
 import openai
 import io
-from pydub import AudioSegment
+# from pydub import AudioSegment  # Requires audioop - commented out for Python 3.13+ compatibility
 
 router = APIRouter()
 
@@ -148,7 +148,7 @@ async def handle_media_stream(websocket: WebSocket):
 
     try:
         async with websockets.connect(
-            'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
+            'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2025-06-03',
             extra_headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
                 "OpenAI-Beta": "realtime=v1"

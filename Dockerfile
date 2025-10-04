@@ -20,4 +20,4 @@ ENV TWILIO_PHONE_NUMBER replace_with_phone_number
 RUN pip install -r requirements.txt
 
 # As an example here we're running the web service with one worker on uvicorn.
-CMD exec uvicorn app:app --host 0.0.0.0 --port ${PORT} --workers 1
+CMD exec uvicorn app:app --host 127.0.0.1 --port ${PORT} --workers 1

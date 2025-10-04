@@ -1,6 +1,13 @@
 from fastapi import FastAPI, Request, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from voice_server import router as voice_router
+
+# Try to import voice_server, but make it optional
+try:
+    from voice_server import router as voice_router
+    VOICE_ENABLED = True
+except ImportError as e:
+    print(f"Voice server disabled: {e}")
+    VOICE_ENABLED = False
 
 app = FastAPI()
 app.add_middleware(
@@ -11,7 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(voice_router)
+if VOICE_ENABLED:
+    app.include_router(voice_router)
+    print("Voice server routes enabled")
+else:
+    print("Running without voice server routes")
 
 import json
 from twilio.twiml.voice_response import VoiceResponse, Gather, Connect, Say, Stream
@@ -62,4 +73,4 @@ async def new_chat(user = Depends(firebase.verify_user)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

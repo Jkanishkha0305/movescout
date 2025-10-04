@@ -27,6 +27,13 @@ class FilteredMovers(BaseModel):
     rationale: str = Field(description="Rationale for filtering the movers")
     movers: List[str] = Field(description="List of filtered movers")
 
+class MarketResearch(BaseModel):
+    """Market research data from Perplexity API"""
+    query: str = Field(description="The research query")
+    content: str = Field(description="Research findings and insights")
+    model_used: str = Field(description="Perplexity model used")
+    timestamp: Optional[str] = Field(default=None, description="When the research was conducted")
+
 class NegotiationStrategy(BaseModel):
     customer_info: CustomerInfo = Field(description="The customer information")
     negotiation_script: str = Field(description="The script of the negotiation")
@@ -41,6 +48,7 @@ class State(TypedDict):
     """State of the moving assistant"""
     messages: Annotated[list, add_messages]  # Tracks conversation
     customer_info: Optional[CustomerInfo] # To populate from the chat agent
+    market_research: Optional[MarketResearch] # Market insights from Perplexity (strategist agent)
     selected_movers: Optional[List[MoverInfo]] # To populate from the planner agent
     negotiation_strategy: Optional[str] # To populate from the planner agent
     summary_of_call_transcripts: Optional[str] # To populate from the planner agent
