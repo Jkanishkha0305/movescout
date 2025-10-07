@@ -283,3 +283,5 @@ WSME==0.12.1
 yappi==1.6.10
 yarl==1.18.3
 zipp==3.21.0
+linkup-sdk
+python-dotenv
